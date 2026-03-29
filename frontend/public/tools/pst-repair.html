@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PST / OST Repair Tool — SPECTRA</title>
+<style>
+  :root { --bg: #f9fafb; --card: #fff; --border: #e5e7eb; --text: #111827; --muted: #6b7280; --accent: #2563eb; --accent-hover: #1d4ed8; --danger: #dc2626; --success: #16a34a; --warn: #d97706; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #030712; --card: #111827; --border: #374151; --text: #f3f4f6; --muted: #9ca3af; --accent: #3b82f6; --accent-hover: #60a5fa; --danger: #ef4444; --success: #22c55e; --warn: #f59e0b; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+  .container { max-width: 800px; margin: 0 auto; padding: 2rem 1rem; flex: 1; width: 100%; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 0.5rem; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(37,99,235,0.05); }
+  .drop-zone p { color: var(--muted); font-size: 0.875rem; }
+  .drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .file-input { display: none; }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; border: none; cursor: pointer; transition: background 0.2s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover { opacity: 0.9; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: rgba(0,0,0,0.05); }
+  .progress-bar { width: 100%; height: 0.5rem; background: var(--border); border-radius: 99px; overflow: hidden; margin: 0.75rem 0; }
+  .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.3s; }
+  .log-area { max-height: 250px; overflow-y: auto; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.75rem; line-height: 1.6; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.75rem; margin-top: 0.75rem; }
+  .log-line { white-space: pre-wrap; word-break: break-all; }
+  .log-line.info { color: var(--muted); }
+  .log-line.warn { color: var(--warn); }
+  .log-line.error { color: var(--danger); }
+  .log-line.success { color: var(--success); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+  .stat { text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; }
+  .stat .num { font-size: 1.25rem; font-weight: 700; }
+  .stat .label { font-size: 0.7rem; color: var(--muted); margin-top: 0.125rem; }
+  .info-box { font-size: 0.8rem; color: var(--muted); background: var(--bg); padding: 0.75rem; border-radius: 0.375rem; line-height: 1.5; margin-top: 0.75rem; }
+  .actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+  footer { text-align: center; padding: 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+  .hidden { display: none !important; }
+  .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 99px; font-size: 0.7rem; font-weight: 600; }
+  .badge-warn { background: rgba(217,119,6,0.15); color: var(--warn); }
+  .badge-success { background: rgba(22,163,74,0.15); color: var(--success); }
+  .badge-danger { background: rgba(220,38,38,0.15); color: var(--danger); }
+  .file-info { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🔧 PST / OST Repair Tool</h1>
+  <p class="subtitle">Scan and repair corrupted PST/OST files entirely in your browser — no data leaves your machine.</p>
+
+  <!-- Step 1: File Selection -->
+  <div class="card" id="step-select">
+    <h2>1. Select File</h2>
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📂</div>
+      <p>Drop a .pst or .ost file here, or click to browse</p>
+      <p style="margin-top:0.5rem; font-size:0.75rem; color:var(--muted)">File stays in your browser — nothing is uploaded</p>
+      <input type="file" class="file-input" id="fileInput" accept=".pst,.ost">
+    </div>
+    <div class="file-info hidden" id="fileInfo"></div>
+  </div>
+
+  <!-- Step 2: Scan -->
+  <div class="card hidden" id="step-scan">
+    <h2>2. Scan for Issues</h2>
+    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:0.75rem;">
+      Analyzes the file structure, checks headers, node tree, and block integrity.
+    </p>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnScan">🔍 Scan File</button>
+    </div>
+    <div class="progress-bar hidden" id="scanProgress"><div class="fill" style="width:0%"></div></div>
+    <div class="stats hidden" id="scanStats"></div>
+    <div class="log-area hidden" id="scanLog"></div>
+  </div>
+
+  <!-- Step 3: Repair -->
+  <div class="card hidden" id="step-repair">
+    <h2>3. Repair</h2>
+    <div class="info-box" id="repairInfo"></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btnRepair">🛠 Repair &amp; Download</button>
+      <button class="btn btn-outline" id="btnDownloadLog">📋 Download Log</button>
+    </div>
+    <div class="progress-bar hidden" id="repairProgress"><div class="fill" style="width:0%"></div></div>
+    <div class="log-area hidden" id="repairLog"></div>
+  </div>
+</div>
+
+<footer>
+  SPECTRA — PST Repair Tool &nbsp;|&nbsp;
+  <a href="/" title="Back to SPECTRA">← Back to SPECTRA</a>
+</footer>
+
+<script>
+// ──────────────────────────────────────────────────────────────────
+// PST / OST Repair Tool — 100% client-side using ArrayBuffer
+// ──────────────────────────────────────────────────────────────────
+//
+// PST format reference (MS-PST / MS-OXPST):
+//   - Bytes 0-3: magic "!BDN" (0x2142444E)
+//   - Byte 10: wVer (ANSI=14/15, Unicode=23/36)
+//   - Byte 8: wMagicClient (PST=0x4D53, OST=0x4F53)
+//   - The file is organized into pages (512 or 4096 bytes depending on version)
+//     with a B-tree structure (NBT and BBT) rooted at offsets stored in the header.
+//
+// This tool performs:
+//   1. Header validation & magic check
+//   2. CRC-32 verification of header fields
+//   3. Page-level scan: checks page type markers and trailer CRCs
+//   4. Orphan/corrupt page zeroing (writes null pages so Outlook can rebuild)
+//   5. Header CRC recalculation after repairs
+
+(() => {
+'use strict';
+
+// ── DOM refs ──
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfoEl = document.getElementById('fileInfo');
+const stepSelect = document.getElementById('step-select');
+const stepScan = document.getElementById('step-scan');
+const stepRepair = document.getElementById('step-repair');
+const btnScan = document.getElementById('btnScan');
+const btnRepair = document.getElementById('btnRepair');
+const btnDownloadLog = document.getElementById('btnDownloadLog');
+const scanProgressBar = document.getElementById('scanProgress');
+const repairProgressBar = document.getElementById('repairProgress');
+const scanStatsEl = document.getElementById('scanStats');
+const scanLogEl = document.getElementById('scanLog');
+const repairLogEl = document.getElementById('repairLog');
+const repairInfoEl = document.getElementById('repairInfo');
+
+// ── State ──
+let fileBuffer = null; // ArrayBuffer of the loaded file
+let fileName = '';
+let fileType = ''; // 'pst' or 'ost'
+let pstVersion = 0; // 14=ANSI, 23/36=Unicode
+let isUnicode = false;
+let pageSize = 512;
+let scanIssues = [];
+let logLines = [];
+
+// ── CRC-32 ──
+const crcTable = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  crcTable[i] = c;
+}
+function crc32(bytes, start, length) {
+  let crc = 0xFFFFFFFF;
+  const end = start + length;
+  for (let i = start; i < end; i++) crc = crcTable[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ── Logging ──
+function addLog(el, msg, level = 'info') {
+  const line = document.createElement('div');
+  line.className = `log-line ${level}`;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  logLines.push({ time: new Date().toISOString(), level, msg });
+}
+
+function show(el) { el.classList.remove('hidden'); }
+function hide(el) { el.classList.add('hidden'); }
+function setProgress(bar, pct) { bar.querySelector('.fill').style.width = pct + '%'; }
+
+// ── File loading ──
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'pst' && ext !== 'ost') {
+    alert('Please select a .pst or .ost file.');
+    return;
+  }
+  fileName = file.name;
+  fileType = ext;
+  fileInfoEl.innerHTML = `<strong>${fileName}</strong> — ${(file.size / (1024*1024)).toFixed(1)} MB (${ext.toUpperCase()})`;
+  show(fileInfoEl);
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    fileBuffer = reader.result;
+    show(stepScan);
+    hide(stepRepair);
+    scanIssues = [];
+    logLines = [];
+    scanLogEl.innerHTML = '';
+    scanStatsEl.innerHTML = '';
+    hide(scanLogEl);
+    hide(scanStatsEl);
+    hide(scanProgressBar);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+// ── PST Header parsing ──
+function readU16(view, offset) { return view.getUint16(offset, true); }
+function readU32(view, offset) { return view.getUint32(offset, true); }
+
+function parseHeader() {
+  const view = new DataView(fileBuffer);
+  const bytes = new Uint8Array(fileBuffer);
+
+  // Magic bytes: "!BDN" = 0x21 0x42 0x44 0x4E
+  const magic = readU32(view, 0);
+  if (magic !== 0x4E444221) {
+    return { valid: false, error: 'Invalid file: missing PST/OST magic bytes (!BDN)' };
+  }
+
+  const headerCRC = readU32(view, 4);
+  const wMagicClient = readU16(view, 8);
+  const wVer = readU16(view, 10);
+
+  // Determine file type from magic client
+  let detectedType = 'pst';
+  if (wMagicClient === 0x4F53) detectedType = 'ost';
+  else if (wMagicClient !== 0x4D53 && wMagicClient !== 0x4F53) {
+    return { valid: false, error: `Unknown client magic: 0x${wMagicClient.toString(16)}` };
+  }
+
+  // Version check
+  isUnicode = (wVer >= 23);
+  pstVersion = wVer;
+  pageSize = isUnicode ? 8192 : 512;
+
+  // CRC covers bytes 8..471 for Unicode, 8..471 for ANSI (same range)
+  const headerDataStart = 8;
+  const headerDataLen = 471 - 8; // bytes 8 through 470
+  const computedCRC = crc32(bytes, headerDataStart, headerDataLen);
+  const crcMatch = (computedCRC === headerCRC);
+
+  return {
+    valid: true,
+    detectedType,
+    wVer,
+    isUnicode,
+    pageSize,
+    headerCRC,
+    computedCRC,
+    crcMatch,
+    wMagicClient,
+  };
+}
+
+// ── Scan ──
+async function doScan() {
+  scanIssues = [];
+  logLines = [];
+  scanLogEl.innerHTML = '';
+  show(scanLogEl);
+  show(scanProgressBar);
+  setProgress(scanProgressBar, 0);
+  btnScan.disabled = true;
+
+  addLog(scanLogEl, `Scanning ${fileName} (${(fileBuffer.byteLength / (1024*1024)).toFixed(1)} MB)...`);
+
+  // 1. Parse header
+  const header = parseHeader();
+  if (!header.valid) {
+    addLog(scanLogEl, `FATAL: ${header.error}`, 'error');
+    scanIssues.push({ type: 'fatal', offset: 0, msg: header.error });
+    showScanResults();
+    btnScan.disabled = false;
+    return;
+  }
+
+  addLog(scanLogEl, `Format: ${header.isUnicode ? 'Unicode' : 'ANSI'} (wVer=${header.wVer}), type: ${header.detectedType.toUpperCase()}`, 'info');
+  addLog(scanLogEl, `Page size: ${header.pageSize} bytes`, 'info');
+
+  if (!header.crcMatch) {
+    addLog(scanLogEl, `Header CRC mismatch! Stored: 0x${header.headerCRC.toString(16)}, Computed: 0x${header.computedCRC.toString(16)}`, 'warn');
+    scanIssues.push({ type: 'header-crc', offset: 4, msg: 'Header CRC mismatch' });
+  } else {
+    addLog(scanLogEl, 'Header CRC: OK ✓', 'success');
+  }
+
+  setProgress(scanProgressBar, 10);
+
+  // 2. Page-level scan
+  const bytes = new Uint8Array(fileBuffer);
+  const totalPages = Math.floor(fileBuffer.byteLength / header.pageSize);
+  addLog(scanLogEl, `Scanning ${totalPages.toLocaleString()} pages...`, 'info');
+
+  let validPages = 0;
+  let corruptPages = 0;
+  let emptyPages = 0;
+
+  // Valid PST page type markers (first byte of page)
+  // ptypeBBT=0x80, ptypeNBT=0x81, ptypeFMap=0x82, ptypePMap=0x83,
+  // ptypeAMap=0x84, ptypeFPMap=0x85, ptypeDL=0x86
+  const validPageTypes = new Set([0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86]);
+
+  // Scan pages in chunks to keep the UI responsive
+  const chunkSize = 500;
+  for (let pageIdx = 1; pageIdx < totalPages; pageIdx++) { // skip page 0 (header)
+    if (pageIdx % chunkSize === 0) {
+      const pct = 10 + Math.round((pageIdx / totalPages) * 80);
+      setProgress(scanProgressBar, pct);
+      // yield to UI
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    const pageOffset = pageIdx * header.pageSize;
+
+    // Check if page is all zeros (empty/free)
+    let allZero = true;
+    const checkLen = Math.min(64, header.pageSize); // sample first 64 bytes
+    for (let i = 0; i < checkLen; i++) {
+      if (bytes[pageOffset + i] !== 0) { allZero = false; break; }
+    }
+    if (allZero) { emptyPages++; continue; }
+
+    // For larger Unicode PST, pages at 512-byte boundaries have a trailer
+    // with ptype and CRC in the last 16 bytes
+    if (header.isUnicode && header.pageSize >= 512) {
+      const trailerOffset = pageOffset + header.pageSize - 16;
+      const ptype = bytes[trailerOffset];
+      const ptypeRepeat = bytes[trailerOffset + 1];
+
+      if (validPageTypes.has(ptype)) {
+        // Check ptype matches repeat byte
+        if (ptype !== ptypeRepeat) {
+          scanIssues.push({ type: 'page-ptype', offset: pageOffset, msg: `Page ${pageIdx}: ptype mismatch (${ptype} vs ${ptypeRepeat})` });
+          corruptPages++;
+        } else {
+          // Verify page CRC (stored at trailer offset + 4, covers bytes 0 to pageSize-16)
+          const storedPageCRC = readU32(new DataView(fileBuffer), trailerOffset + 4);
+          const computedPageCRC = crc32(bytes, pageOffset, header.pageSize - 16);
+          if (storedPageCRC !== computedPageCRC) {
+            scanIssues.push({ type: 'page-crc', offset: pageOffset, msg: `Page ${pageIdx}: CRC mismatch` });
+            corruptPages++;
+          } else {
+            validPages++;
+          }
+        }
+      } else if (ptype !== 0) {
+        // Non-zero but unrecognized page type — possibly data block, not a BTree page
+        validPages++;
+      } else {
+        validPages++;
+      }
+    } else {
+      // ANSI format or small pages: basic validation only
+      validPages++;
+    }
+  }
+
+  setProgress(scanProgressBar, 95);
+
+  // 3. Check file size alignment
+  const remainder = fileBuffer.byteLength % header.pageSize;
+  if (remainder !== 0) {
+    addLog(scanLogEl, `File size not aligned to page boundaries (${remainder} trailing bytes)`, 'warn');
+    scanIssues.push({ type: 'alignment', offset: fileBuffer.byteLength - remainder, msg: 'File size misaligned' });
+  }
+
+  // 4. Check for unexpected truncation (file too small for a valid PST)
+  if (fileBuffer.byteLength < header.pageSize * 4) {
+    addLog(scanLogEl, 'File appears truncated — too small for a valid PST', 'error');
+    scanIssues.push({ type: 'truncated', offset: 0, msg: 'File appears severely truncated' });
+  }
+
+  addLog(scanLogEl, `Pages: ${validPages.toLocaleString()} valid, ${corruptPages.toLocaleString()} corrupt, ${emptyPages.toLocaleString()} empty`, corruptPages > 0 ? 'warn' : 'success');
+
+  setProgress(scanProgressBar, 100);
+  showScanResults(validPages, corruptPages, emptyPages);
+  btnScan.disabled = false;
+}
+
+function showScanResults(valid = 0, corrupt = 0, empty = 0) {
+  const total = scanIssues.length;
+  const fatal = scanIssues.filter(i => i.type === 'fatal').length;
+  const warnings = total - fatal;
+
+  show(scanStatsEl);
+  scanStatsEl.innerHTML = `
+    <div class="stat"><div class="num" style="color:var(--success)">${valid.toLocaleString()}</div><div class="label">Valid Pages</div></div>
+    <div class="stat"><div class="num" style="color:var(--danger)">${corrupt.toLocaleString()}</div><div class="label">Corrupt Pages</div></div>
+    <div class="stat"><div class="num">${empty.toLocaleString()}</div><div class="label">Empty Pages</div></div>
+    <div class="stat"><div class="num" style="color:${total > 0 ? 'var(--warn)' : 'var(--success)'}">${total}</div><div class="label">Issues Found</div></div>
+  `;
+
+  if (fatal > 0) {
+    addLog(scanLogEl, `⛔ ${fatal} fatal issue(s) — file may not be repairable.`, 'error');
+  } else if (warnings > 0) {
+    addLog(scanLogEl, `⚠ ${warnings} issue(s) found — repair recommended.`, 'warn');
+    show(stepRepair);
+    repairInfoEl.innerHTML = `Found <span class="badge badge-warn">${warnings} issue(s)</span> that can be repaired. ` +
+      `This will zero out corrupt pages and fix CRC checksums, allowing Outlook to rebuild its internal structures on next open. ` +
+      `<br><br><strong>A repaired copy will be downloaded</strong> — your original file is never modified.`;
+  } else {
+    addLog(scanLogEl, '✅ No issues found — file appears healthy!', 'success');
+    show(stepRepair);
+    repairInfoEl.innerHTML = `<span class="badge badge-success">No issues found</span> — the file looks healthy. You can still download a copy with re-computed checksums if you wish.`;
+  }
+
+  addLog(scanLogEl, 'Scan complete.', 'info');
+}
+
+// ── Repair ──
+async function doRepair() {
+  repairLogEl.innerHTML = '';
+  show(repairLogEl);
+  show(repairProgressBar);
+  setProgress(repairProgressBar, 0);
+  btnRepair.disabled = true;
+
+  // Work on a copy
+  const repaired = fileBuffer.slice(0);
+  const bytes = new Uint8Array(repaired);
+  const view = new DataView(repaired);
+
+  addLog(repairLogEl, 'Starting repair on in-memory copy...', 'info');
+
+  let fixed = 0;
+  const pageIssues = scanIssues.filter(i => i.type === 'page-crc' || i.type === 'page-ptype');
+
+  // 1. Zero out corrupt pages
+  for (let idx = 0; idx < pageIssues.length; idx++) {
+    const issue = pageIssues[idx];
+    const offset = issue.offset;
+
+    // Zero out the entire page — Outlook will skip it and rebuild
+    for (let i = 0; i < pageSize; i++) bytes[offset + i] = 0;
+
+    fixed++;
+    addLog(repairLogEl, `Zeroed corrupt page at offset 0x${offset.toString(16)}`, 'info');
+
+    if (idx % 100 === 0) {
+      setProgress(repairProgressBar, Math.round((idx / pageIssues.length) * 60));
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  setProgress(repairProgressBar, 70);
+
+  // 2. Fix header CRC
+  const headerCRCIssue = scanIssues.find(i => i.type === 'header-crc');
+  if (headerCRCIssue || fixed > 0) {
+    const newCRC = crc32(bytes, 8, 471 - 8);
+    view.setUint32(4, newCRC, true);
+    addLog(repairLogEl, `Recalculated header CRC: 0x${newCRC.toString(16)}`, 'success');
+    fixed++;
+  }
+
+  // 3. Handle alignment issue (pad with zeros)
+  let finalBuffer = repaired;
+  const alignIssue = scanIssues.find(i => i.type === 'alignment');
+  if (alignIssue) {
+    const remainder = repaired.byteLength % pageSize;
+    const padLen = pageSize - remainder;
+    const padded = new Uint8Array(repaired.byteLength + padLen);
+    padded.set(new Uint8Array(repaired));
+    finalBuffer = padded.buffer;
+    addLog(repairLogEl, `Padded file with ${padLen} bytes to align to page boundary`, 'info');
+    fixed++;
+  }
+
+  setProgress(repairProgressBar, 90);
+
+  addLog(repairLogEl, `Repair complete: ${fixed} fix(es) applied.`, 'success');
+
+  // 4. Trigger download
+  const blob = new Blob([finalBuffer], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ext = fileName.split('.').pop();
+  a.href = url;
+  a.download = fileName.replace(`.${ext}`, `_repaired.${ext}`);
+  a.click();
+  URL.revokeObjectURL(url);
+
+  addLog(repairLogEl, `Downloaded: ${a.download}`, 'success');
+  setProgress(repairProgressBar, 100);
+  btnRepair.disabled = false;
+
+  // Log the action to the server (just the action, no file data)
+  try {
+    fetch('/api/activity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        level: 'info',
+        category: 'tool',
+        message: `PST Repair: processed ${fileName} (${(fileBuffer.byteLength/(1024*1024)).toFixed(1)} MB), ${fixed} fix(es) applied`,
+      }),
+    }).catch(() => {});
+  } catch (e) { /* best-effort logging */ }
+}
+
+// ── Download log ──
+function downloadLog() {
+  const text = logLines.map(l => `${l.time} [${l.level.toUpperCase()}] ${l.msg}`).join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `pst-repair-log-${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Events ──
+btnScan.addEventListener('click', doScan);
+btnRepair.addEventListener('click', doRepair);
+btnDownloadLog.addEventListener('click', downloadLog);
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./watch:/app/watch
+    environment:
+      - DATABASE_PATH=/app/data/emails.db
+      - UPLOAD_DIR=/app/uploads
+      - WATCH_DIR=/app/watch
+      - PROJECTS_DIR=/app/data/projects
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

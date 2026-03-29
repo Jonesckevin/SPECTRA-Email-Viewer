@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSG Viewer — SPECTRA</title>
+<style>
+  :root { --bg: #f9fafb; --card: #fff; --border: #e5e7eb; --text: #111827; --muted: #6b7280; --accent: #2563eb; --accent-hover: #1d4ed8; --danger: #dc2626; --success: #16a34a; --warn: #d97706; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #030712; --card: #111827; --border: #374151; --text: #f3f4f6; --muted: #9ca3af; --accent: #3b82f6; --accent-hover: #60a5fa; --danger: #ef4444; --success: #22c55e; --warn: #f59e0b; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+  .container { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; flex: 1; width: 100%; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1rem; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 0.5rem; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(37,99,235,0.05); }
+  .drop-zone p { color: var(--muted); font-size: 0.875rem; }
+  .drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .file-input { display: none; }
+  .hidden { display: none !important; }
+  footer { text-align: center; padding: 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  .email-header { margin-bottom: 1rem; }
+  .email-header .field { display: flex; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .email-header .field-label { font-weight: 600; min-width: 80px; color: var(--muted); flex-shrink: 0; }
+  .email-header .field-value { word-break: break-word; }
+  .email-header .subject { font-size: 1.1rem; font-weight: 700; padding: 0.5rem 0; border-bottom: 2px solid var(--border); }
+
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 1rem; }
+  .tab { padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--muted); transition: all 0.2s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .body-frame { width: 100%; border: 1px solid var(--border); border-radius: 0.375rem; min-height: 300px; background: #fff; }
+  .body-text { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 0.85rem; line-height: 1.6; padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; min-height: 200px; max-height: 500px; overflow-y: auto; }
+  .props-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  .props-table th { text-align: left; padding: 0.3rem 0.5rem; background: var(--bg); border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 600; }
+  .props-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-all; }
+  .props-table td:first-child { font-family: 'Cascadia Code', 'Fira Code', monospace; white-space: nowrap; font-size: 0.7rem; }
+
+  .attachments { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .attachment { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer; transition: background 0.2s; }
+  .attachment:hover { background: var(--border); }
+  .attachment .size { color: var(--muted); font-size: 0.7rem; }
+
+  .file-info { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+  .error-msg { color: var(--danger); font-size: 0.85rem; padding: 1rem; background: rgba(220,38,38,0.08); border-radius: 0.375rem; margin-top: 0.75rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>💼 MSG Viewer</h1>
+  <p class="subtitle">View Outlook .msg files directly in your browser — nothing is uploaded.</p>
+
+  <div class="card" id="step-select">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📂</div>
+      <p>Drop a .msg file here, or click to browse</p>
+      <p style="margin-top:0.5rem; font-size:0.75rem; color:var(--muted)">File stays in your browser — nothing is uploaded</p>
+      <input type="file" class="file-input" id="fileInput" accept=".msg">
+    </div>
+    <div class="file-info hidden" id="fileInfo"></div>
+  </div>
+
+  <div class="card hidden" id="emailCard">
+    <div class="email-header" id="emailHeader"></div>
+
+    <div class="hidden" id="attachmentsSection" style="margin-bottom:1rem;">
+      <div style="font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:0.4rem;">📎 Attachments</div>
+      <div class="attachments" id="attachmentsList"></div>
+    </div>
+
+    <div class="tabs" id="tabBar">
+      <button class="tab active" data-tab="body">Body</button>
+      <button class="tab" data-tab="props">Properties</button>
+    </div>
+
+    <div id="panel-body"></div>
+    <div id="panel-props" class="hidden"></div>
+  </div>
+</div>
+
+<footer>
+  SPECTRA — MSG Viewer &nbsp;|&nbsp;
+  <a href="/" title="Back to SPECTRA">← Back to SPECTRA</a>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+// ── DOM ──
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfoEl = document.getElementById('fileInfo');
+const emailCard = document.getElementById('emailCard');
+const emailHeader = document.getElementById('emailHeader');
+const attachmentsSection = document.getElementById('attachmentsSection');
+const attachmentsList = document.getElementById('attachmentsList');
+const tabBar = document.getElementById('tabBar');
+const panelBody = document.getElementById('panel-body');
+const panelProps = document.getElementById('panel-props');
+
+// ── File handling ──
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'msg') { alert('Please select a .msg file.'); return; }
+
+  fileInfoEl.innerHTML = `<strong>${esc(file.name)}</strong> — ${(file.size / 1024).toFixed(1)} KB`;
+  fileInfoEl.classList.remove('hidden');
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const msg = parseCFB(new Uint8Array(reader.result));
+      renderMsg(msg);
+    } catch (e) {
+      emailCard.classList.remove('hidden');
+      emailHeader.innerHTML = `<div class="error-msg">Failed to parse MSG file: ${esc(e.message)}</div>`;
+      panelBody.innerHTML = '';
+      panelProps.innerHTML = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+// ── Tabs ──
+tabBar.addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  tabBar.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const tab = btn.dataset.tab;
+  panelBody.classList.toggle('hidden', tab !== 'body');
+  panelProps.classList.toggle('hidden', tab !== 'props');
+});
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// ══════════════════════════════════════════════════════════════════
+//  OLE2 / Compound File Binary Format (CFB) parser
+//  Ref: [MS-CFB] https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cfb
+// ══════════════════════════════════════════════════════════════════
+
+function parseCFB(data) {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  // ── Header (sector 0) ──
+  // Magic: D0 CF 11 E0 A1 B1 1A E1
+  const magic = [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+  for (let i = 0; i < 8; i++) {
+    if (data[i] !== magic[i]) throw new Error('Not a valid OLE2/CFB file (bad magic)');
+  }
+
+  const sectorSizePow = view.getUint16(30, true);
+  const sectorSize = 1 << sectorSizePow; // typically 512
+  const miniSectorSizePow = view.getUint16(32, true);
+  const miniSectorSize = 1 << miniSectorSizePow; // typically 64
+  const miniStreamCutoff = view.getUint32(56, true); // typically 4096
+
+  const fatSectors = view.getUint32(44, true);
+  const firstDirSector = view.getUint32(48, true);
+  const firstMiniFatSector = view.getUint32(60, true);
+  const numMiniFatSectors = view.getUint32(64, true);
+  const firstDIFATSector = view.getUint32(68, true);
+  const numDIFATSectors = view.getUint32(72, true);
+
+  // Sector helper
+  function sectorOffset(sec) { return (sec + 1) * sectorSize; }
+  function readSector(sec) {
+    const off = sectorOffset(sec);
+    return data.slice(off, off + sectorSize);
+  }
+
+  // ── Build FAT ──
+  // First 109 DIFAT entries are in the header at offset 76
+  const difat = [];
+  for (let i = 0; i < 109; i++) {
+    const s = view.getUint32(76 + i * 4, true);
+    if (s < 0xFFFFFFFE) difat.push(s);
+  }
+  // Extra DIFAT sectors
+  let difatSec = firstDIFATSector;
+  for (let i = 0; i < numDIFATSectors && difatSec < 0xFFFFFFFE; i++) {
+    const off = sectorOffset(difatSec);
+    const entriesPerSec = (sectorSize / 4) - 1;
+    for (let j = 0; j < entriesPerSec; j++) {
+      const s = view.getUint32(off + j * 4, true);
+      if (s < 0xFFFFFFFE) difat.push(s);
+    }
+    difatSec = view.getUint32(off + entriesPerSec * 4, true);
+  }
+
+  // Build full FAT array
+  const fatEntries = [];
+  for (const s of difat) {
+    const off = sectorOffset(s);
+    for (let i = 0; i < sectorSize; i += 4) {
+      fatEntries.push(view.getUint32(off + i, true));
+    }
+  }
+
+  // Follow a FAT chain to read a stream
+  function readStream(startSector, length) {
+    const result = new Uint8Array(length);
+    let sec = startSector;
+    let pos = 0;
+    while (sec < 0xFFFFFFFE && pos < length) {
+      const sectorData = readSector(sec);
+      const toCopy = Math.min(sectorSize, length - pos);
+      result.set(sectorData.slice(0, toCopy), pos);
+      pos += toCopy;
+      sec = fatEntries[sec];
+      if (sec === undefined) break;
+    }
+    return result;
+  }
+
+  // ── Build Mini-FAT ──
+  const miniFatEntries = [];
+  if (firstMiniFatSector < 0xFFFFFFFE) {
+    let sec = firstMiniFatSector;
+    while (sec < 0xFFFFFFFE) {
+      const off = sectorOffset(sec);
+      for (let i = 0; i < sectorSize; i += 4) {
+        miniFatEntries.push(view.getUint32(off + i, true));
+      }
+      sec = fatEntries[sec];
+      if (sec === undefined) break;
+    }
+  }
+
+  // ── Read directory entries ──
+  const dirEntries = [];
+  let dirSec = firstDirSector;
+  while (dirSec < 0xFFFFFFFE) {
+    const off = sectorOffset(dirSec);
+    const entriesPerSec = sectorSize / 128;
+    for (let i = 0; i < entriesPerSec; i++) {
+      const eOff = off + i * 128;
+      if (eOff + 128 > data.byteLength) break;
+
+      const nameLen = view.getUint16(eOff + 64, true);
+      let name = '';
+      for (let c = 0; c < Math.max(0, nameLen - 2); c += 2) {
+        const ch = view.getUint16(eOff + c, true);
+        if (ch === 0) break;
+        name += String.fromCharCode(ch);
+      }
+
+      const objType = data[eOff + 66];
+      const startSec = view.getUint32(eOff + 116, true);
+      const streamSize = view.getUint32(eOff + 120, true); // only lower 32 bits
+
+      dirEntries.push({ name, objType, startSec, streamSize, offset: eOff });
+    }
+    dirSec = fatEntries[dirSec];
+    if (dirSec === undefined) break;
+  }
+
+  // ── Mini-stream (from root entry) ──
+  const rootEntry = dirEntries[0];
+  let miniStreamData = new Uint8Array(0);
+  if (rootEntry && rootEntry.startSec < 0xFFFFFFFE && rootEntry.streamSize > 0) {
+    miniStreamData = readStream(rootEntry.startSec, rootEntry.streamSize);
+  }
+
+  function readMiniStream(startSector, length) {
+    const result = new Uint8Array(length);
+    let sec = startSector;
+    let pos = 0;
+    while (sec < 0xFFFFFFFE && pos < length) {
+      const off = sec * miniSectorSize;
+      const toCopy = Math.min(miniSectorSize, length - pos);
+      if (off + toCopy <= miniStreamData.length) {
+        result.set(miniStreamData.slice(off, off + toCopy), pos);
+      }
+      pos += toCopy;
+      sec = miniFatEntries[sec];
+      if (sec === undefined) break;
+    }
+    return result;
+  }
+
+  // ── Read any stream (auto-select mini vs. regular) ──
+  function readAnyStream(entry) {
+    if (entry.streamSize === 0 || entry.startSec >= 0xFFFFFFFE) return new Uint8Array(0);
+    if (entry.streamSize < miniStreamCutoff) {
+      return readMiniStream(entry.startSec, entry.streamSize);
+    }
+    return readStream(entry.startSec, entry.streamSize);
+  }
+
+  // ── Extract MSG properties ──
+  // MSG property stream entry names follow pattern: __substg1.0_PPPPTTTT
+  // PPPP = property ID (hex), TTTT = property type (hex)
+  // Common property IDs (MS-OXPROPS):
+  const PROP_MAP = {
+    '0037': 'Subject',       // PidTagSubject
+    '0042': 'SentRepresenting', // PidTagSentRepresentingName
+    '0065': 'SentRepresentingEmail',
+    '0C1A': 'SenderName',    // PidTagSenderName
+    '0C1F': 'SenderEmail',   // PidTagSenderEmailAddress
+    '0E04': 'DisplayTo',     // PidTagDisplayTo
+    '0E03': 'DisplayCc',     // PidTagDisplayCc
+    '1000': 'BodyText',      // PidTagBody
+    '1009': 'BodyRTF',       // PidTagRtfCompressed
+    '1013': 'BodyHTML',      // PidTagBodyHtml (as string)
+    '1035': 'InternetMessageId',
+    '007D': 'TransportHeaders',
+    '0070': 'ConversationTopic',
+    '003D': 'SubjectPrefix',
+    '0039': 'ClientSubmitTime',
+    '0E06': 'MessageDeliveryTime',
+    '0040': 'ReceivedTime',
+    '3001': 'DisplayName',    // used in attachment sub-objects
+    '3701': 'AttachData',     // PidTagAttachDataBinary
+    '3704': 'AttachFilename', // PidTagAttachFilename
+    '3707': 'AttachLongFilename', // PidTagAttachLongFilename
+    '370E': 'AttachMimeTag',
+  };
+
+  const TYPE_STRING8  = '001E';
+  const TYPE_STRING16 = '001F';
+  const TYPE_BINARY   = '0102';
+
+  const properties = {};
+  const attachments = [];
+  const allProps = []; // for the properties tab
+
+  // Group entries by storage path
+  // Root properties are directly under root
+  // Attachments are under __attach_version1.0_#XXXX
+  const attachDirs = {};
+
+  for (const entry of dirEntries) {
+    if (entry.objType === 0) continue; // empty
+
+    // Check if this is an attachment directory
+    const attachMatch = entry.name.match(/^__attach_version1\.0_#(\d+)/i);
+    if (attachMatch && entry.objType === 1) {
+      attachDirs[entry.name] = { entries: [], meta: {} };
+      continue;
+    }
+
+    // Property stream: __substg1.0_PPPPTTTT
+    const propMatch = entry.name.match(/^__substg1\.0_([0-9A-Fa-f]{4})([0-9A-Fa-f]{4})/);
+    if (!propMatch) continue;
+
+    const propId = propMatch[1].toUpperCase();
+    const propType = propMatch[2].toUpperCase();
+    const propName = PROP_MAP[propId] || propId;
+    const streamData = readAnyStream(entry);
+
+    let value;
+    if (propType === TYPE_STRING16 || propType === '001F') {
+      // UTF-16LE
+      value = decodeUTF16LE(streamData);
+    } else if (propType === TYPE_STRING8 || propType === '001E') {
+      value = new TextDecoder('utf-8').decode(streamData);
+    } else if (propType === TYPE_BINARY || propType === '0102') {
+      value = streamData; // keep as binary
+    } else {
+      value = streamData;
+    }
+
+    // Determine if this belongs to an attachment directory
+    // Simple heuristic: check the offset in the dir tree
+    // For a proper implementation we'd walk the red-black tree,
+    // but entries are typically ordered: root props first, then attach dirs
+    let isAttachProp = false;
+    for (const [dirName, att] of Object.entries(attachDirs)) {
+      // The entry follows the attachment directory — very simplified
+      // We'll assign based on the entry index
+    }
+
+    properties[propName] = value;
+    if (typeof value === 'string' && value.length < 2000) {
+      allProps.push({ id: '0x' + propId, type: '0x' + propType, name: propName, value });
+    } else if (value instanceof Uint8Array) {
+      allProps.push({ id: '0x' + propId, type: '0x' + propType, name: propName, value: `[Binary: ${value.byteLength} bytes]` });
+    }
+  }
+
+  // ── Extract attachments via storage hierarchy ──
+  // Walk directory entries looking for __attach storage objects and their children
+  const attachIndices = [];
+  for (let i = 0; i < dirEntries.length; i++) {
+    if (dirEntries[i].name.match(/^__attach_version1\.0_/i) && dirEntries[i].objType === 1) {
+      attachIndices.push(i);
+    }
+  }
+
+  for (const ai of attachIndices) {
+    const att = { filename: '', mimeType: 'application/octet-stream', data: null };
+    // Collect child entries that follow this storage
+    for (let j = ai + 1; j < dirEntries.length; j++) {
+      const e = dirEntries[j];
+      if (e.objType === 1 || e.objType === 0) break; // next storage or empty = boundary
+      const pm = e.name.match(/^__substg1\.0_([0-9A-Fa-f]{4})([0-9A-Fa-f]{4})/);
+      if (!pm) continue;
+      const pid = pm[1].toUpperCase();
+      const ptype = pm[2].toUpperCase();
+      const sd = readAnyStream(e);
+      if (pid === '3707') att.filename = (ptype === '001F') ? decodeUTF16LE(sd) : new TextDecoder().decode(sd);
+      else if (pid === '3704' && !att.filename) att.filename = (ptype === '001F') ? decodeUTF16LE(sd) : new TextDecoder().decode(sd);
+      else if (pid === '370E') att.mimeType = (ptype === '001F') ? decodeUTF16LE(sd) : new TextDecoder().decode(sd);
+      else if (pid === '3701') att.data = sd;
+    }
+    if (att.data && att.data.byteLength > 0) {
+      attachments.push(att);
+    }
+  }
+
+  return { properties, attachments, allProps };
+}
+
+function decodeUTF16LE(data) {
+  const codes = [];
+  for (let i = 0; i + 1 < data.length; i += 2) {
+    const c = data[i] | (data[i + 1] << 8);
+    if (c === 0) break;
+    codes.push(c);
+  }
+  return String.fromCharCode(...codes);
+}
+
+// ── Render ──
+function renderMsg(msg) {
+  const p = msg.properties;
+  const subject = str(p.Subject) || str(p.ConversationTopic) || '(no subject)';
+  const from = str(p.SenderName) || str(p.SentRepresenting) || '';
+  const fromEmail = str(p.SenderEmail) || str(p.SentRepresentingEmail) || '';
+  const to = str(p.DisplayTo) || '';
+  const cc = str(p.DisplayCc) || '';
+  const date = str(p.ClientSubmitTime) || str(p.MessageDeliveryTime) || str(p.ReceivedTime) || '';
+  const headers = str(p.TransportHeaders) || '';
+
+  let headerHtml = `<div class="subject">${esc(subject)}</div>`;
+  headerHtml += field('From', from + (fromEmail && fromEmail !== from ? ` <${fromEmail}>` : ''));
+  headerHtml += field('To', to);
+  if (cc) headerHtml += field('Cc', cc);
+  if (date) headerHtml += field('Date', date);
+  if (headers) {
+    // Extract date from transport headers if we don't have one
+    const dm = headers.match(/^Date:\s*(.+)/mi);
+    if (dm && !date) headerHtml += field('Date', dm[1].trim());
+  }
+  emailHeader.innerHTML = headerHtml;
+
+  // Body
+  const bodyHtml = str(p.BodyHTML);
+  const bodyText = str(p.BodyText);
+
+  if (bodyHtml) {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'body-frame';
+    iframe.sandbox = 'allow-same-origin';
+    iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5;color:#111;margin:0.75rem;word-wrap:break-word;}img{max-width:100%;height:auto;}</style></head><body>${bodyHtml}</body></html>`;
+    panelBody.innerHTML = '';
+    panelBody.appendChild(iframe);
+    iframe.onload = () => { iframe.style.height = (iframe.contentDocument.documentElement.scrollHeight + 30) + 'px'; };
+  } else if (bodyText) {
+    panelBody.innerHTML = `<div class="body-text">${esc(bodyText)}</div>`;
+  } else {
+    // Try BodyHTML as binary (it's sometimes stored as binary 0x0102)
+    const htmlBin = p.BodyHTML;
+    if (htmlBin instanceof Uint8Array && htmlBin.byteLength > 0) {
+      const decoded = new TextDecoder('utf-8').decode(htmlBin);
+      const iframe = document.createElement('iframe');
+      iframe.className = 'body-frame';
+      iframe.sandbox = 'allow-same-origin';
+      iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:sans-serif;font-size:14px;line-height:1.5;margin:0.75rem;word-wrap:break-word;}img{max-width:100%;}</style></head><body>${decoded}</body></html>`;
+      panelBody.innerHTML = '';
+      panelBody.appendChild(iframe);
+      iframe.onload = () => { iframe.style.height = (iframe.contentDocument.documentElement.scrollHeight + 30) + 'px'; };
+    } else {
+      panelBody.innerHTML = `<div class="body-text" style="color:var(--muted)">(no body content)</div>`;
+    }
+  }
+
+  // Properties tab
+  if (msg.allProps.length) {
+    let tbl = '<table class="props-table"><thead><tr><th>ID</th><th>Name</th><th>Value</th></tr></thead><tbody>';
+    for (const prop of msg.allProps) {
+      tbl += `<tr><td>${esc(prop.id)}</td><td>${esc(prop.name)}</td><td>${esc(String(prop.value).slice(0, 500))}</td></tr>`;
+    }
+    tbl += '</tbody></table>';
+    panelProps.innerHTML = tbl;
+  }
+
+  // Attachments
+  if (msg.attachments.length) {
+    attachmentsSection.classList.remove('hidden');
+    attachmentsList.innerHTML = '';
+    for (const att of msg.attachments) {
+      const el = document.createElement('div');
+      el.className = 'attachment';
+      el.innerHTML = `📄 ${esc(att.filename || 'attachment')} <span class="size">(${formatSize(att.data.byteLength)})</span>`;
+      el.title = 'Click to download';
+      el.addEventListener('click', () => {
+        const blob = new Blob([att.data], { type: att.mimeType || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = att.filename || 'attachment';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      attachmentsList.appendChild(el);
+    }
+  } else {
+    attachmentsSection.classList.add('hidden');
+  }
+
+  emailCard.classList.remove('hidden');
+}
+
+function str(v) {
+  if (typeof v === 'string') return v;
+  if (v instanceof Uint8Array) return '';
+  return '';
+}
+
+function field(label, value) {
+  return `<div class="field"><span class="field-label">${label}</span><span class="field-value">${esc(value)}</span></div>`;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+})();
+</script>
+</body>
+</html>

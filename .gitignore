@@ -1,0 +1,38 @@
+# Runtime data
+data/
+uploads/
+watch/*.mbox
+watch/*.eml
+watch/*.pst
+watch/*.ost
+watch/*.msg
+watch/*.olm
+watch/*.edb
+watch/processed/
+watch/failed/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+*.log

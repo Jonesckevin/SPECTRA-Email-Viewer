@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EML Viewer — SPECTRA</title>
+<style>
+  :root { --bg: #f9fafb; --card: #fff; --border: #e5e7eb; --text: #111827; --muted: #6b7280; --accent: #2563eb; --accent-hover: #1d4ed8; --danger: #dc2626; --success: #16a34a; --warn: #d97706; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #030712; --card: #111827; --border: #374151; --text: #f3f4f6; --muted: #9ca3af; --accent: #3b82f6; --accent-hover: #60a5fa; --danger: #ef4444; --success: #22c55e; --warn: #f59e0b; }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+  .container { max-width: 960px; margin: 0 auto; padding: 2rem 1rem; flex: 1; width: 100%; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 0.5rem; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(37,99,235,0.05); }
+  .drop-zone p { color: var(--muted); font-size: 0.875rem; }
+  .drop-zone .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .file-input { display: none; }
+  .hidden { display: none !important; }
+  footer { text-align: center; padding: 1rem; font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--border); }
+  footer a { color: var(--muted); text-decoration: none; }
+  footer a:hover { color: var(--text); }
+
+  /* Email display */
+  .email-header { margin-bottom: 1rem; }
+  .email-header .field { display: flex; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .email-header .field-label { font-weight: 600; min-width: 80px; color: var(--muted); flex-shrink: 0; }
+  .email-header .field-value { word-break: break-word; }
+  .email-header .subject { font-size: 1.1rem; font-weight: 700; padding: 0.5rem 0; border-bottom: 2px solid var(--border); }
+
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 1rem; }
+  .tab { padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--muted); transition: all 0.2s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .body-frame { width: 100%; border: 1px solid var(--border); border-radius: 0.375rem; min-height: 300px; background: #fff; }
+  .body-text { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 0.85rem; line-height: 1.6; padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; min-height: 200px; max-height: 500px; overflow-y: auto; }
+  .raw-headers { white-space: pre-wrap; word-break: break-all; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.7rem; line-height: 1.5; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; max-height: 400px; overflow-y: auto; }
+  .raw-source { white-space: pre-wrap; word-break: break-all; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.7rem; line-height: 1.4; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; max-height: 500px; overflow-y: auto; }
+
+  .attachments { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .attachment { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer; transition: background 0.2s; }
+  .attachment:hover { background: var(--border); }
+  .attachment .size { color: var(--muted); font-size: 0.7rem; }
+
+  .file-info { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; border: none; cursor: pointer; transition: background 0.2s; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: rgba(0,0,0,0.05); }
+  .inline-image { max-width: 100%; margin: 0.5rem 0; border-radius: 0.375rem; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📧 EML Viewer</h1>
+  <p class="subtitle">View .eml files directly in your browser — nothing is uploaded.</p>
+
+  <!-- File picker -->
+  <div class="card" id="step-select">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📂</div>
+      <p>Drop a .eml file here, or click to browse</p>
+      <p style="margin-top:0.5rem; font-size:0.75rem; color:var(--muted)">File stays in your browser — nothing is uploaded</p>
+      <input type="file" class="file-input" id="fileInput" accept=".eml">
+    </div>
+    <div class="file-info hidden" id="fileInfo"></div>
+  </div>
+
+  <!-- Email display -->
+  <div class="card hidden" id="emailCard">
+    <div class="email-header" id="emailHeader"></div>
+
+    <!-- Attachments bar -->
+    <div class="hidden" id="attachmentsSection" style="margin-bottom:1rem;">
+      <div style="font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:0.4rem;">📎 Attachments</div>
+      <div class="attachments" id="attachmentsList"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabBar">
+      <button class="tab active" data-tab="body">Body</button>
+      <button class="tab" data-tab="headers">Headers</button>
+      <button class="tab" data-tab="source">Source</button>
+    </div>
+
+    <!-- Tab panels -->
+    <div id="panel-body"></div>
+    <div id="panel-headers" class="hidden"></div>
+    <div id="panel-source" class="hidden"></div>
+  </div>
+</div>
+
+<footer>
+  SPECTRA — EML Viewer &nbsp;|&nbsp;
+  <a href="/" title="Back to SPECTRA">← Back to SPECTRA</a>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfoEl = document.getElementById('fileInfo');
+const emailCard = document.getElementById('emailCard');
+const emailHeader = document.getElementById('emailHeader');
+const attachmentsSection = document.getElementById('attachmentsSection');
+const attachmentsList = document.getElementById('attachmentsList');
+const tabBar = document.getElementById('tabBar');
+const panelBody = document.getElementById('panel-body');
+const panelHeaders = document.getElementById('panel-headers');
+const panelSource = document.getElementById('panel-source');
+
+let rawSource = '';
+
+// ── File handling ──
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'eml') { alert('Please select a .eml file.'); return; }
+
+  fileInfoEl.innerHTML = `<strong>${esc(file.name)}</strong> — ${(file.size / 1024).toFixed(1)} KB`;
+  fileInfoEl.classList.remove('hidden');
+
+  const reader = new FileReader();
+  reader.onload = () => { rawSource = reader.result; parseAndRender(rawSource); };
+  reader.readAsText(file);
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+// ── Tabs ──
+tabBar.addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  tabBar.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const tab = btn.dataset.tab;
+  panelBody.classList.toggle('hidden', tab !== 'body');
+  panelHeaders.classList.toggle('hidden', tab !== 'headers');
+  panelSource.classList.toggle('hidden', tab !== 'source');
+});
+
+// ── Escaping ──
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── MIME Parsing ──
+function parseAndRender(source) {
+  const { headers, headerBlock, body } = splitHeadersAndBody(source);
+
+  const subject = getHeader(headers, 'subject') || '(no subject)';
+  const from = getHeader(headers, 'from') || '';
+  const to = getHeader(headers, 'to') || '';
+  const cc = getHeader(headers, 'cc') || '';
+  const date = getHeader(headers, 'date') || '';
+  const contentType = getHeader(headers, 'content-type') || 'text/plain';
+
+  // Render header card
+  let html = `<div class="subject">${esc(decodeHeader(subject))}</div>`;
+  html += field('From', decodeHeader(from));
+  html += field('To', decodeHeader(to));
+  if (cc) html += field('Cc', decodeHeader(cc));
+  html += field('Date', decodeHeader(date));
+  emailHeader.innerHTML = html;
+
+  // Parse body (handle multipart)
+  const parsed = parseBody(contentType, body, headers);
+
+  // Render body panel
+  if (parsed.html) {
+    const iframe = document.createElement('iframe');
+    iframe.className = 'body-frame';
+    iframe.sandbox = 'allow-same-origin';
+    iframe.srcdoc = buildSrcdoc(parsed.html, parsed.cidMap);
+    panelBody.innerHTML = '';
+    panelBody.appendChild(iframe);
+    iframe.onload = () => {
+      iframe.style.height = (iframe.contentDocument.documentElement.scrollHeight + 30) + 'px';
+    };
+  } else {
+    panelBody.innerHTML = `<div class="body-text">${esc(parsed.text || '(empty)')}</div>`;
+  }
+
+  // Attachments
+  if (parsed.attachments.length) {
+    attachmentsSection.classList.remove('hidden');
+    attachmentsList.innerHTML = '';
+    for (const att of parsed.attachments) {
+      const el = document.createElement('div');
+      el.className = 'attachment';
+      el.innerHTML = `📄 ${esc(att.filename)} <span class="size">(${formatSize(att.data.byteLength)})</span>`;
+      el.title = 'Click to download';
+      el.addEventListener('click', () => downloadBlob(att.data, att.contentType, att.filename));
+      attachmentsList.appendChild(el);
+    }
+  } else {
+    attachmentsSection.classList.add('hidden');
+  }
+
+  // Headers panel
+  panelHeaders.innerHTML = `<div class="raw-headers">${esc(headerBlock)}</div>`;
+
+  // Source panel
+  panelSource.innerHTML = `<div class="raw-source">${esc(rawSource.slice(0, 500000))}${rawSource.length > 500000 ? '\n\n… (truncated)' : ''}</div>`;
+
+  emailCard.classList.remove('hidden');
+}
+
+function field(label, value) {
+  return `<div class="field"><span class="field-label">${label}</span><span class="field-value">${esc(value)}</span></div>`;
+}
+
+function splitHeadersAndBody(source) {
+  const idx = source.indexOf('\r\n\r\n');
+  const idx2 = source.indexOf('\n\n');
+  let splitPos;
+  if (idx >= 0 && (idx2 < 0 || idx < idx2)) splitPos = idx;
+  else splitPos = idx2 >= 0 ? idx2 : source.length;
+
+  const headerBlock = source.slice(0, splitPos);
+  const bodyStart = source.charAt(splitPos) === '\r' ? splitPos + 4 : splitPos + 2;
+  const body = source.slice(bodyStart);
+
+  // Unfold headers (continuation lines start with whitespace)
+  const unfolded = headerBlock.replace(/\r?\n([ \t]+)/g, ' ');
+  const headers = {};
+  for (const line of unfolded.split(/\r?\n/)) {
+    const m = line.match(/^([^:]+):\s*(.*)/);
+    if (m) {
+      const key = m[1].toLowerCase();
+      headers[key] = headers[key] ? headers[key] + ', ' + m[2] : m[2];
+    }
+  }
+  return { headers, headerBlock, body };
+}
+
+function getHeader(headers, key) {
+  return headers[key.toLowerCase()] || '';
+}
+
+function decodeHeader(value) {
+  // Decode =?charset?encoding?text?= sequences
+  return value.replace(/=\?([^?]+)\?(Q|B)\?([^?]*)\?=/gi, (_, charset, enc, text) => {
+    try {
+      if (enc.toUpperCase() === 'B') {
+        const bytes = Uint8Array.from(atob(text), c => c.charCodeAt(0));
+        return new TextDecoder(charset).decode(bytes);
+      }
+      // Quoted-printable
+      const decoded = text.replace(/_/g, ' ').replace(/=([0-9A-Fa-f]{2})/g, (__, hex) => String.fromCharCode(parseInt(hex, 16)));
+      const bytes = Uint8Array.from(decoded, c => c.charCodeAt(0));
+      return new TextDecoder(charset).decode(bytes);
+    } catch { return text; }
+  });
+}
+
+// ── Multipart / body parsing ──
+function parseBody(contentType, body, headers) {
+  const result = { text: '', html: '', attachments: [], cidMap: {} };
+  const ctLower = contentType.toLowerCase();
+
+  if (ctLower.startsWith('multipart/')) {
+    const boundary = extractParam(contentType, 'boundary');
+    if (boundary) {
+      parseParts(body, boundary, result);
+      return result;
+    }
+  }
+
+  // Single-part
+  const encoding = getHeader(headers, 'content-transfer-encoding') || '7bit';
+  const decoded = decodeContent(body, encoding);
+  const charset = extractParam(contentType, 'charset') || 'utf-8';
+  const text = decodeCharset(decoded, charset);
+
+  if (ctLower.startsWith('text/html')) result.html = text;
+  else result.text = text;
+
+  return result;
+}
+
+function parseParts(body, boundary, result) {
+  const delim = '--' + boundary;
+  const parts = body.split(delim);
+
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i];
+    if (part.startsWith('--')) break; // closing boundary
+
+    const { headers: pH, body: pBody } = splitPartHeadersAndBody(part);
+    const pCT = (pH['content-type'] || 'text/plain').toLowerCase();
+    const pEncoding = pH['content-transfer-encoding'] || '7bit';
+    const pDisposition = pH['content-disposition'] || '';
+    const pCid = (pH['content-id'] || '').replace(/^<|>$/g, '');
+
+    // Nested multipart
+    if (pCT.startsWith('multipart/')) {
+      const nestedBoundary = extractParam(pH['content-type'] || '', 'boundary');
+      if (nestedBoundary) parseParts(pBody, nestedBoundary, result);
+      continue;
+    }
+
+    const decoded = decodeContent(pBody.trim(), pEncoding.trim());
+    const isAttachment = pDisposition.includes('attachment') || (pDisposition.includes('filename') && !pCT.startsWith('text/'));
+    const filename = extractFilename(pDisposition) || extractParam(pH['content-type'] || '', 'name') || '';
+
+    // Inline images with Content-ID
+    if (pCid && pCT.startsWith('image/')) {
+      const blob = new Blob([decoded], { type: pCT.split(';')[0].trim() });
+      result.cidMap[pCid] = URL.createObjectURL(blob);
+      if (isAttachment || filename) {
+        result.attachments.push({ filename: filename || 'image', contentType: pCT, data: decoded });
+      }
+      continue;
+    }
+
+    if (isAttachment || (filename && !pCT.startsWith('text/'))) {
+      result.attachments.push({ filename: filename || 'attachment', contentType: pCT, data: decoded });
+      continue;
+    }
+
+    const charset = extractParam(pH['content-type'] || '', 'charset') || 'utf-8';
+    const text = decodeCharset(decoded, charset);
+    if (pCT.startsWith('text/html')) result.html = result.html || text;
+    else if (pCT.startsWith('text/plain')) result.text = result.text || text;
+  }
+}
+
+function splitPartHeadersAndBody(part) {
+  // Strip leading CRLF/LF
+  const stripped = part.replace(/^\r?\n/, '');
+  const idx = stripped.indexOf('\r\n\r\n');
+  const idx2 = stripped.indexOf('\n\n');
+  let splitPos;
+  if (idx >= 0 && (idx2 < 0 || idx < idx2)) splitPos = idx;
+  else splitPos = idx2 >= 0 ? idx2 : stripped.length;
+
+  const headerBlock = stripped.slice(0, splitPos);
+  const bodyStart = stripped.charAt(splitPos) === '\r' ? splitPos + 4 : splitPos + 2;
+  const body = stripped.slice(bodyStart);
+
+  const unfolded = headerBlock.replace(/\r?\n([ \t]+)/g, ' ');
+  const headers = {};
+  for (const line of unfolded.split(/\r?\n/)) {
+    const m = line.match(/^([^:]+):\s*(.*)/);
+    if (m) headers[m[1].toLowerCase()] = m[2];
+  }
+  return { headers, body };
+}
+
+function extractParam(header, param) {
+  const re = new RegExp(param + '\\s*=\\s*"?([^";\\s]+)"?', 'i');
+  const m = header.match(re);
+  return m ? m[1] : '';
+}
+
+function extractFilename(disposition) {
+  // Try filename*= (RFC 5987) first, then filename=
+  const m2 = disposition.match(/filename\*\s*=\s*([^']*)'[^']*'([^;\s]+)/i);
+  if (m2) {
+    try { return decodeURIComponent(m2[2]); } catch {}
+  }
+  const m = disposition.match(/filename\s*=\s*"?([^";\r\n]+)"?/i);
+  return m ? decodeHeader(m[1].trim()) : '';
+}
+
+function decodeContent(text, encoding) {
+  const enc = encoding.toLowerCase().trim();
+  if (enc === 'base64') {
+    const clean = text.replace(/[\r\n\s]/g, '');
+    try {
+      const bstr = atob(clean);
+      const arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) arr[i] = bstr.charCodeAt(i);
+      return arr;
+    } catch { return new TextEncoder().encode(text); }
+  }
+  if (enc === 'quoted-printable') {
+    const decoded = text
+      .replace(/=\r?\n/g, '') // soft line breaks
+      .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+    return new TextEncoder().encode(decoded);
+  }
+  // 7bit, 8bit, binary
+  return new TextEncoder().encode(text);
+}
+
+function decodeCharset(data, charset) {
+  if (typeof data === 'string') return data;
+  try { return new TextDecoder(charset).decode(data); }
+  catch { return new TextDecoder('utf-8').decode(data); }
+}
+
+function buildSrcdoc(html, cidMap) {
+  // Replace cid: references with blob URLs
+  let result = html;
+  for (const [cid, url] of Object.entries(cidMap)) {
+    result = result.replace(new RegExp(`cid:${cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), url);
+  }
+  // Wrap in safe document
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5;color:#111;margin:0.75rem;word-wrap:break-word;}img{max-width:100%;height:auto;}</style></head><body>${result}</body></html>`;
+}
+
+function downloadBlob(data, contentType, filename) {
+  const blob = new Blob([data], { type: contentType.split(';')[0].trim() || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+})();
+</script>
+</body>
+</html>
