@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.14.3-slim-bookworm
 
 # System dependencies for email parsing, image export
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,7 +19,12 @@ RUN printf '#!/bin/bash\nxvfb-run -a wkhtmltoimage "$@"' > /usr/local/bin/wkhtml
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libyara-dev \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y --auto-remove build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY app/ ./app/
 
