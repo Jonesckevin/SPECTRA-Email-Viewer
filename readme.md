@@ -1,6 +1,6 @@
 # SPECTRA
 
-**S**uspicious **P**ost & **E**mail **C**apture **T**ool for **R**apid **A**nalysis
+### **S**uspicious **P**ost & **E**mail **C**apture **T**ool for **R**apid **A**nalysis
 
 A containerized email forensics platform for DFIR analysts. Import email archives, search with full-text queries, run YARA scans, and analyze suspicious indicators // all from a browser.
 
